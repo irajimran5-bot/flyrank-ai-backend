@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import Expense from "../models/Expense.js";
 
 dotenv.config();
 
@@ -13,6 +14,9 @@ export const analyzeTextWithAI = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "promptText is required" });
     }
 
+    let aiResult;
+    let source = "gemini-api";
+
     try {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -22,31 +26,32 @@ export const analyzeTextWithAI = async (req, res, next) => {
           systemInstruction: "You are a precise backend AI assistant. Always return your response in a valid JSON object format with keys: 'summary', 'category', and 'confidenceScore'.",
         },
       });
-
-      const aiResult = JSON.parse(response.text);
-      return res.status(200).json({
-        success: true,
-        source: "gemini-api",
-        data: aiResult,
-      });
-
+      aiResult = JSON.parse(response.text);
     } catch (apiError) {
-      console.warn("Gemini API connection failed, switching to fallback heuristic engine:", apiError.message);
-
-     
-      const fallbackResult = {
+      source = "offline-fallback";
+      aiResult = {
         summary: `Processed locally: "${promptText.substring(0, 40)}..."`,
-        category: promptText.toLowerCase().includes("food") || promptText.toLowerCase().includes("groceries") ? "Food & Groceries" : "General Expense",
-        confidenceScore: 0.50, 
-        note: "Generated via offline fallback due to network restriction."
+        category: promptText.toLowerCase().includes("food") ? "Food & Groceries" : "General Expense",
+        confidenceScore: 0.50
       };
-
-      return res.status(200).json({
-        success: true,
-        source: "offline-fallback",
-        data: fallbackResult,
-      });
     }
+
+    try {
+      await Expense.create({
+        summary: aiResult.summary,
+        category: aiResult.category,
+        confidenceScore: aiResult.confidenceScore,
+        originalText: promptText
+      });
+    } catch (dbError) {
+      console.warn("Database save failed, but proceeding with response:", dbError.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      source,
+      data: aiResult
+    });
 
   } catch (error) {
     console.error("Critical Server Error:", error);
