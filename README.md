@@ -18,3 +18,6 @@ A production-ready backend AI service built with Node.js, Express, Google Gemini
 2. Run `npm install` to install dependencies.
 3. Create a `.env` file with `PORT`, `GEMINI_API_KEY`, and `MONGO_URI`.
 4. Run `npm run dev` to start the development server.
+
+
+For more, follow me on LinkedIn (profile link in about section of my github profile)
